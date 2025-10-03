@@ -1,0 +1,41 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  email              String    @unique
+  name               String?
+  password           String
+  mustChangePassword Boolean?  @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  receipts           Receipt[] // Um usuário pode ter vários recibos
+}
+
+model Receipt {
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  number       String
+  clientName   String
+  companyName  String?
+  address      String // Representando o método de pagamento
+  cpfCnpj      String
+  requester    String
+  passengers   String
+  services     Json // Usamos o tipo JSON para armazenar a lista de serviços
+  observations String?
+  language     String
+  grandTotal   Float
+
+  createdAt    DateTime @default(now())
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  createdById  Int
+}
