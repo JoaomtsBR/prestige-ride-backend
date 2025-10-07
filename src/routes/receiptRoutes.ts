@@ -1,116 +1,110 @@
-// src/routes/receiptRoutes.ts
+// src/routes/receiptRoutes.ts (VERSÃO ATUALIZADA COM PRISMA)
 import { Router, Request, Response } from 'express';
+import { prisma } from '../lib/prisma'; // <-- Importa o Prisma Client
 import { authMiddleware } from '../middleware/authMiddleware';
-import { readReceipts, writeReceipts, Receipt } from '../services/receiptService';
 
 const router = Router();
-
-// Aplica o middleware de autenticação a todas as rotas deste arquivo.
-// Isso garante que apenas usuários logados possam acessar os endpoints de recibos.
 router.use(authMiddleware);
 
-// -----------------------------------------------------------------------------
-// MÉTODO GET: Obter todos os recibos (Read)
-// -----------------------------------------------------------------------------
+// GET /api/receipts - Obter todos os recibos do usuário logado
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const receipts = await readReceipts();
+    const userId = req.user?.userId;
+    const receipts = await prisma.receipt.findMany({
+      where: { createdById: userId },
+      orderBy: { createdAt: 'desc' }, // Ordena os mais recentes primeiro
+    });
     res.status(200).json(receipts);
   } catch (error) {
-    console.error('Erro ao buscar recibos:', error);
-    res.status(500).json({ message: 'Erro interno do servidor ao buscar recibos.' });
+    console.error("Erro ao buscar recibos:", error);
+    res.status(500).json({ message: 'Erro ao buscar recibos.' });
   }
 });
 
-// -----------------------------------------------------------------------------
-// MÉTODO POST: Criar um novo recibo (Create)
-// -----------------------------------------------------------------------------
+// POST /api/receipts - Criar um novo recibo
 router.post('/', async (req: Request, res: Response) => {
   try {
-    // Pega os dados do corpo da requisição
-    const newReceiptData = req.body;
-    // Pega o ID do usuário que está logado (adicionado pelo authMiddleware)
+    const receiptData = req.body;
     const userId = req.user?.userId;
 
     if (!userId) {
-      return res.status(401).json({ message: 'Usuário não autenticado corretamente.' });
+      return res.status(401).json({ message: 'Usuário não autenticado.' });
     }
 
-    // Lê os recibos existentes
-    const receipts = await readReceipts();
-    
-    // Cria o objeto completo do novo recibo
-    const newReceipt: Receipt = {
-      ...newReceiptData,
-      id: Date.now(), // Gera um ID simples baseado no timestamp
-      createdAt: new Date(),
-      createdBy: userId,
-    };
-
-    // Adiciona o novo recibo à lista
-    receipts.push(newReceipt);
-    
-    // Salva a lista atualizada no arquivo
-    await writeReceipts(receipts);
-
-    // Retorna o recibo criado com o status 201 (Created)
+    const newReceipt = await prisma.receipt.create({
+      data: {
+        ...receiptData,
+        date: new Date(receiptData.date), // Garante que a data seja um objeto Date
+        createdById: userId, // Associa o recibo ao usuário logado
+      },
+    });
     res.status(201).json(newReceipt);
-
   } catch (error) {
-    console.error('Erro ao criar recibo:', error);
-    res.status(500).json({ message: 'Erro interno do servidor ao criar recibo.' });
+    console.error("Erro ao criar recibo:", error);
+    res.status(500).json({ message: 'Erro ao criar recibo.' });
   }
 });
 
-// -----------------------------------------------------------------------------
-// MÉTODO PUT: Atualizar um recibo existente (Update)
-// -----------------------------------------------------------------------------
+// PUT /api/receipts/:id - Atualizar um recibo
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const receiptId = parseInt(req.params.id, 10);
     const updates = req.body;
-    
-    const receipts = await readReceipts();
-    const receiptIndex = receipts.findIndex(r => r.id === receiptId);
 
-    if (receiptIndex === -1) {
-      return res.status(404).json({ message: 'Recibo não encontrado.' });
+    // Converte a data principal, se ela existir
+    if (updates.date && typeof updates.date === 'string') {
+      updates.date = new Date(updates.date);
     }
 
-    // Combina o recibo antigo com as atualizações, garantindo que o ID e a data de criação não mudem
-    receipts[receiptIndex] = { ...receipts[receiptIndex], ...updates };
-    
-    await writeReceipts(receipts);
+    // Converte as datas DENTRO do array de serviços, se ele existir
+    if (updates.services && Array.isArray(updates.services)) {
+      updates.services = updates.services.map((service: any) => ({
+        ...service,
+        // Garante que serviceDate seja um objeto Date antes de salvar
+        serviceDate: service.serviceDate ? new Date(service.serviceDate) : new Date(),
+      }));
+    }
 
-    res.status(200).json(receipts[receiptIndex]);
+
+    // Lógica de segurança para garantir que o usuário é o "dono" do recibo
+    const receipt = await prisma.receipt.findFirst({
+      where: { id: receiptId, createdById: req.user?.userId }
+    });
+
+    if (!receipt) {
+      return res.status(404).json({ message: 'Recibo não encontrado ou acesso negado.' });
+    }
+
+    const updatedReceipt = await prisma.receipt.update({
+      where: { id: receiptId },
+      data: updates, // 'updates' agora tem todas as datas no formato correto
+    });
+    res.status(200).json(updatedReceipt);
   } catch (error) {
-    console.error('Erro ao atualizar recibo:', error);
-    res.status(500).json({ message: 'Erro interno do servidor ao atualizar recibo.' });
+    console.error("Erro ao atualizar recibo:", error);
+    res.status(500).json({ message: 'Erro ao atualizar recibo.' });
   }
 });
 
-// -----------------------------------------------------------------------------
-// MÉTODO DELETE: Deletar um recibo (Delete)
-// -----------------------------------------------------------------------------
+// DELETE /api/receipts/:id - Deletar um recibo
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const receiptId = parseInt(req.params.id, 10);
-    
-    const receipts = await readReceipts();
-    const updatedReceipts = receipts.filter(r => r.id !== receiptId);
 
-    // Verifica se algum item foi realmente removido
-    if (receipts.length === updatedReceipts.length) {
-      return res.status(404).json({ message: 'Recibo não encontrado.' });
+    // Garante que o usuário só possa deletar seus próprios recibos
+    const receipt = await prisma.receipt.findFirst({
+      where: { id: receiptId, createdById: req.user?.userId }
+    });
+
+    if (!receipt) {
+      return res.status(404).json({ message: 'Recibo não encontrado ou acesso negado.' });
     }
 
-    await writeReceipts(updatedReceipts);
-    
-    // Retorna 204 (No Content), indicando sucesso na exclusão sem enviar dados de volta
-    res.status(204).send(); 
+    await prisma.receipt.delete({ where: { id: receiptId } });
+    res.status(204).send();
   } catch (error) {
-    console.error('Erro ao deletar recibo:', error);
-    res.status(500).json({ message: 'Erro interno do servidor ao deletar recibo.' });
+    console.error("Erro ao deletar recibo:", error);
+    res.status(500).json({ message: 'Erro ao deletar recibo.' });
   }
 });
 

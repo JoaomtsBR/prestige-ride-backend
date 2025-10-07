@@ -1,10 +1,13 @@
 // src/server.ts
+console.log("--- ✅ EXECUTANDO A VERSÃO POSTGRESQL - 16:12 de 06/10/2025 ---");
 import dotenv from 'dotenv';
 dotenv.config();
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes';
 import receiptRoutes from './routes/receiptRoutes';
+
+
 
 const app = express();
 const port = 3000;

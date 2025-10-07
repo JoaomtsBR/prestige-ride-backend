@@ -1,138 +1,87 @@
-// src/routes/authRoutes.ts
-
+// src/routes/authRoutes.ts (VERSÃO ATUALIZADA COM PRISMA)
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { readUsers, writeUsers } from '../services/userService';
+import { prisma } from '../lib/prisma'; // <-- Importa o Prisma Client
 import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
 
+// Rota de Registro
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'E-mail e senha são obrigatórios.' });
-    }
-
-    const users = await readUsers();
-
-    const existingUser = users.find(user => user.email === email);
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(409).json({ message: 'Este e-mail já está em uso.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = {
-      id: Date.now(),
-      name,
-      email,
-      password: hashedPassword,
-      createdAt: new Date(),
-      mustChangePassword: true,
-    };
-
-    users.push(newUser);
-    await writeUsers(users);
-
-    return res.status(201).json({
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        mustChangePassword: true, // Mantém a regra de negócio
+      },
     });
 
+    // Retorna o usuário sem a senha
+    const { password: _, ...userWithoutPassword } = user;
+    res.status(201).json(userWithoutPassword);
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Erro interno do servidor.' });
+    console.error("Erro no registro:", error);
+    res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 });
 
+// Rota de Login
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    const user = await prisma.user.findUnique({ where: { email } });
 
-    // 1. Validação básica de entrada
-    if (!email || !password) {
-      return res.status(400).json({ message: 'E-mail e senha são obrigatórios.' });
-    }
-
-    // 2. Buscar o usuário no nosso "banco de dados"
-    const users = await readUsers();
-    const user = users.find(u => u.email === email);
-
-    // 3. Se o usuário não for encontrado, retorne um erro genérico
     if (!user) {
-      return res.status(401).json({ message: 'Credenciais inválidas.' }); // Usamos 401 por segurança
+      return res.status(401).json({ message: 'Credenciais inválidas.' });
     }
 
-    // 4. Comparar a senha enviada com a senha criptografada salva
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Credenciais inválidas.' });
     }
 
-    // 5. Se a senha for válida, gerar o JWT
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error('A chave secreta do JWT não foi definida no .env');
-    }
+    const jwtSecret = process.env.JWT_SECRET!;
+    const token = jwt.sign({ userId: user.id }, jwtSecret, { expiresIn: '8h' });
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email }, // O que vai dentro do token (payload)
-      jwtSecret,                              // A chave secreta
-      { expiresIn: '8h' }                      // Duração do token
-    );
-
-    // 6. Enviar o token E O SINALIZADOR como resposta
-    return res.status(200).json({
-      token,
-      mustChangePassword: user.mustChangePassword ?? false, // <-- MODIFIQUE A RESPOSTA
-    });
-
+    res.status(200).json({ token, mustChangePassword: user.mustChangePassword ?? false });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Erro interno do servidor.' });
+    console.error("Erro no login:", error);
+    res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 });
 
+// Rota para Alterar Senha
 router.post('/change-password', authMiddleware, async (req: Request, res: Response) => {
-  // Se chegou até aqui, o middleware já validou o token.
-
-  const { newPassword } = req.body;
-  const userId = req.user?.userId; // Pegamos o ID do usuário que veio do token
-
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ message: 'A nova senha é obrigatória e deve ter pelo menos 6 caracteres.' });
-  }
-
   try {
-    const users = await readUsers();
+    const { newPassword } = req.body;
+    const userId = req.user?.userId;
 
-    // Encontra o índice do usuário na lista
-    const userIndex = users.findIndex(u => u.id === userId);
-
-    if (userIndex === -1) {
-      return res.status(404).json({ message: 'Usuário não encontrado.' });
+    if (!userId || !newPassword) {
+      return res.status(400).json({ message: 'Dados inválidos.' });
     }
 
-    // Criptografa a nova senha
     const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword, mustChangePassword: false },
+    });
 
-    // Atualiza a senha do usuário e o sinalizador
-    users[userIndex].password = hashedPassword;
-    users[userIndex].mustChangePassword = false;
-
-    // Salva a lista de usuários atualizada no arquivo
-    await writeUsers(users);
-
-    return res.status(200).json({ message: 'Senha alterada com sucesso.' });
-
+    res.status(200).json({ message: 'Senha alterada com sucesso.' });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Erro interno do servidor.' });
+    console.error("Erro ao alterar senha:", error);
+    res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 });
 
