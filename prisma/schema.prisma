@@ -26,16 +26,32 @@ model Receipt {
   number       String
   clientName   String
   companyName  String?
-  address      String // Representando o método de pagamento
+  address      String
   cpfCnpj      String
   requester    String
   passengers   String
-  services     Json // Usamos o tipo JSON para armazenar a lista de serviços
+  services     Json
   observations String?
   language     String
   grandTotal   Float
 
+  // --- NOVAS COLUNAS A SEREM ADICIONADAS ---
+  estacionamento      Float?
+  estacionamentoReal  Float?
+  taxaCartao          Float?
+  despesa             Float?
+  quilometragem       Float?
+  notaFiscal          String?
+  motorista           String?
+  despesas            String?
+  pedagio             Float?
+  litrosAbastecidos   Float?
+  valorCombustivel    Float?
+  impostoPercentual   Float?
+  impostoValor        Float? // Adicionei este também, pois estava no formulário
+
   createdAt    DateTime @default(now())
-  createdBy    User     @relation(fields: [createdById], references: [id])
+  updatedAt    DateTime @default(now()) @updatedAt
   createdById  Int
+  createdBy    User     @relation(fields: [createdById], references: [id])
 }

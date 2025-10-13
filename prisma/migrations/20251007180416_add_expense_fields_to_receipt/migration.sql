@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "Receipt" ADD COLUMN     "despesa" DOUBLE PRECISION,
+ADD COLUMN     "despesas" TEXT,
+ADD COLUMN     "estacionamento" DOUBLE PRECISION,
+ADD COLUMN     "estacionamentoReal" DOUBLE PRECISION,
+ADD COLUMN     "impostoPercentual" DOUBLE PRECISION,
+ADD COLUMN     "impostoValor" DOUBLE PRECISION,
+ADD COLUMN     "litrosAbastecidos" DOUBLE PRECISION,
+ADD COLUMN     "motorista" TEXT,
+ADD COLUMN     "notaFiscal" TEXT,
+ADD COLUMN     "pedagio" DOUBLE PRECISION,
+ADD COLUMN     "quilometragem" DOUBLE PRECISION,
+ADD COLUMN     "taxaCartao" DOUBLE PRECISION,
+ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "valorCombustivel" DOUBLE PRECISION;
