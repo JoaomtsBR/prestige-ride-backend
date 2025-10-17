@@ -13,10 +13,11 @@ model User {
   email              String   @unique
   name               String?
   password           String
-  mustChangePassword Boolean? @default(true)
+  mustChangePassword Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-  createdReceipts    Receipt[]
+
+  createdReceipts Receipt[]
 }
 
 model Driver {
@@ -24,16 +25,19 @@ model Driver {
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  services  Service[]
+
+  services Service[]
 }
 
 model Route {
-  id            Int     @id @default(autoincrement())
-  origin        String
-  destination   String
-  tollCost      Float?
-  mileage       Float?
-  services      Service[]
+  id          Int      @id @default(autoincrement())
+  origin      String
+  destination String
+  tollCost    Decimal  @default(0) @db.Decimal(12, 2)
+  mileage     Decimal? @db.Decimal(10, 1)
+
+  services Service[]
+
   @@unique([origin, destination], name: "origin_destination_unique")
 }
 
@@ -44,48 +48,58 @@ model Receipt {
   clientName   String
   companyName  String?
   address      String
-  cpfCnpj      String
+  cpfCnpj      String   @db.VarChar(20)
   requester    String
-  passengers   String
-  observations String?
-  language     String
-  grandTotal   Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdById Int
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  services    Service[]
+  passengers   String? // Alterado para String? para corresponder a 'text'
+  observations String? // Alterado para String? para corresponder a 'text'
+  language     String   @db.VarChar(5)
+  grandTotal   Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  Int
+  createdBy    User     @relation(fields: [createdById], references: [id])
+
+  services Service[]
 }
 
 model Service {
   id          Int      @id @default(autoincrement())
   serviceDate DateTime
-  transfer    Float
-  extras      Float
-  total       Float
-  routeId     Int
-  route       Route    @relation(fields: [routeId], references: [id])
-  receiptId   Int
-  receipt     Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  driverId    Int
-  driver      Driver   @relation(fields: [driverId], references: [id])
-  expense     Expense?
+  transfer    Decimal  @default(0) @db.Decimal(12, 2)
+  extras      Decimal  @default(0) @db.Decimal(12, 2)
+  total       Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  routeId   Int
+  route     Route   @relation(fields: [routeId], references: [id])
+  driverId  Int
+  driver    Driver  @relation(fields: [driverId], references: [id])
+
+  // --- LINHAS CORRETAMENTE EDITADAS ---
+  receiptId Int?
+  receipt   Receipt? @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  expense Expense?
 }
 
 model Expense {
-  id                Int     @id @default(autoincrement())
-  estacionamento    Float?
-  estacionamentoReal Float?
-  taxaCartao        Float?
-  despesa           Float?
-  quilometragem     Float?
-  pedagio           Float?
-  litrosAbastecidos Float?
-  valorCombustivel  Float?
-  impostoPercentual Float?
-  impostoValor      Float?
+  id                Int      @id @default(autoincrement())
+  estacionamento    Decimal? @default(0) @db.Decimal(12, 2)
+  estacionamentoReal Decimal? @default(0) @db.Decimal(12, 2)
+  taxaCartao        Decimal? @default(0) @db.Decimal(12, 2)
+  despesa           Decimal? @default(0) @db.Decimal(12, 2)
+  quilometragem     Decimal? @db.Decimal(10, 1)
+  pedagio           Decimal? @default(0) @db.Decimal(12, 2)
+  litrosAbastecidos Decimal? @db.Decimal(10, 3)
+  valorCombustivel  Decimal? @db.Decimal(12, 2)
+  impostoPercentual Decimal? @default(0) @db.Decimal(5, 2)
+  impostoValor      Decimal? @default(0) @db.Decimal(12, 2)
   notaFiscal        String?
-  despesas          String?
-  serviceId         Int     @unique
-  service           Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  despesas          String? // Corresponde a 'text'
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  serviceId Int     @unique
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 }
