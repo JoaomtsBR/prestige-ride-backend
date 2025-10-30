@@ -1,7 +1,12 @@
 node_modules
 # Keep environment variables out of version control
+<<<<<<< HEAD
 .env.development
 .env.production
+=======
+.env.production
+.env.development
+>>>>>>> a92702373dac43898e411043e66a87a667a66378
 # Ignore build output
 /dist
 db.json
