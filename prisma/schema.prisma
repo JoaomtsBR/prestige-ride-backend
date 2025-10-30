@@ -35,6 +35,7 @@ model Route {
   destination String
   tollCost    Decimal  @default(0) @db.Decimal(12, 2)
   mileage     Decimal? @db.Decimal(10, 1)
+  direction   String   @default("ida") 
 
   services Service[]
 

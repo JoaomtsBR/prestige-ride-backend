@@ -13,14 +13,14 @@ routeRoutes.post(
   authMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const { origin, destination, tollCost, mileage } = req.body;
+      const { origin, destination, tollCost, mileage, direction } = req.body;
       if (!origin || !destination) {
         return res
           .status(400)
           .json({ error: "Origin and destination are required" });
       }
       const route = await prisma.route.create({
-        data: { origin, destination, tollCost, mileage },
+        data: { origin, destination, tollCost, mileage, direction },
       });
       const serializedRoute = convertDecimalsToNumbers(route);
       return res.status(201).json(serializedRoute);
@@ -87,10 +87,10 @@ routeRoutes.put(
   async (req: Request, res: Response) => {
     try {
       const routeId = parseInt(req.params.id, 10);
-      const { origin, destination, tollCost, mileage } = req.body;
+      const { origin, destination, tollCost, mileage, direction } = req.body;
       const updatedRoute = await prisma.route.update({
         where: { id: routeId },
-        data: { origin, destination, tollCost, mileage },
+        data: { origin, destination, tollCost, mileage, direction },
       });
       const serializedRoute = convertDecimalsToNumbers(updatedRoute);
       return res.json(serializedRoute);
