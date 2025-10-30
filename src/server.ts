@@ -1,19 +1,6 @@
 // src/server.ts
 import dotenv from "dotenv";
-
-const envFile = process.env.NODE_ENV === 'production'
-  ? '.env.production'
-  : '.env.development';
-
-// Carrega o arquivo .env específico
-const envConfig = dotenv.config({ path: envFile });
-
-if (envConfig.error) {
-  console.error(`Erro ao carregar o arquivo ${envFile}:`, envConfig.error.message);
-  throw new Error(`Não foi possível carregar o arquivo de ambiente ${envFile}. Ele existe?`);
-}
-
-console.log(`--- ✅ Carregando ambiente de [${process.env.NODE_ENV}] do arquivo [${envFile}] ---`);
+dotenv.config();
 
 import express, { Request, Response } from "express";
 import cors from "cors";
