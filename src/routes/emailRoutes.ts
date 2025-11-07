@@ -8,14 +8,14 @@ const router = Router();
 router.use(authMiddleware);
 
 router.post('/send', async (req: Request, res: Response) => {
-    const { toEmail, subject, htmlContent } = req.body;
+    const { toEmail, subject, htmlContent, attachments } = req.body;
 
     if (!toEmail || !subject || !htmlContent) {
         return res.status(400).json({ message: 'Campos obrigatórios: toEmail, subject, htmlContent' });
     }
 
     try {
-        await sendEmail(toEmail, subject, htmlContent);
+        await sendEmail(toEmail, subject, htmlContent, attachments);
         res.status(200).json({ message: 'E-mail enviado com sucesso.' });
     } catch (error) {
         res.status(500).json({ message: 'Erro ao enviar o e-mail.' });

@@ -66,6 +66,7 @@ model Receipt {
 model Service {
   id          Int      @id @default(autoincrement())
   serviceDate DateTime
+  passengerTransported  String?
   transfer    Decimal  @default(0) @db.Decimal(12, 2)
   extras      Decimal  @default(0) @db.Decimal(12, 2)
   total       Decimal  @default(0) @db.Decimal(12, 2)

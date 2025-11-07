@@ -19,13 +19,26 @@ const transporter = nodemailer.createTransport({
  * @param subject Assunto do e-mail
  * @param html Corpo do e-mail em HTML
  */
-export async function sendEmail(to: string, subject: string, html: string) {
+export async function sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    attachments?: Array<{ filename: string; content: string; encoding: string; contentType?: string }>
+) {
     try {
+        // Converter attachments de base64 para Buffer
+        const processedAttachments = attachments?.map(att => ({
+            filename: att.filename,
+            content: Buffer.from(att.content, 'base64'),
+            contentType: att.contentType || 'application/pdf'
+        }));
+
         const info = await transporter.sendMail({
             from: `"Angel Car Locadora" <${process.env.GMAIL_USER}>`,
             to: to,
             subject: subject,
             html: html,
+            attachments: processedAttachments || []
         });
 
         console.log("E-mail enviado com sucesso: %s", info.messageId);

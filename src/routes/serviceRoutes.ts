@@ -4,7 +4,7 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { convertDecimalsToNumbers } from "../lib/serialization";
-import { Prisma } from "@prisma/client"; // <-- 1. Importe os tipos do Prisma
+import { Prisma } from "@prisma/client";
 
 export const serviceRoutes = Router();
 
@@ -14,8 +14,17 @@ serviceRoutes.use(authMiddleware);
 // CREATE: Rota para criar um serviço de forma independente
 serviceRoutes.post("/services", async (req: Request, res: Response) => {
   try {
-    const { serviceDate, transfer, extras, total, routeId, driverId, expense } =
-      req.body;
+    // --- ALTERAÇÃO: Adicionado passengerTransported ---
+    const {
+      serviceDate,
+      transfer,
+      extras,
+      total,
+      routeId,
+      driverId,
+      expense,
+      passengerTransported,
+    } = req.body;
 
     if (!routeId || !driverId || !serviceDate) {
       return res.status(400).json({
@@ -29,13 +38,14 @@ serviceRoutes.post("/services", async (req: Request, res: Response) => {
     const newService = await prisma.service.create({
       data: {
         serviceDate: new Date(serviceDate),
+        passengerTransported,
         transfer,
         extras,
         total: calculatedTotal,
         route: { connect: { id: routeId } },
         driver: { connect: { id: driverId } },
         expense: { create: expense || {} },
-        receipt: undefined, // or set to null if you want no receipt on creation
+        receipt: undefined,
       },
       include: { route: true, driver: true, expense: true },
     });
@@ -51,7 +61,7 @@ serviceRoutes.post("/services", async (req: Request, res: Response) => {
   }
 });
 
-// READ (All services for the user, with filtering) - VERSÃO CORRIGIDA
+// READ (All services for the user, with filtering)
 serviceRoutes.get("/services", async (req: Request, res: Response) => {
   try {
     const userId = req.user?.userId;
@@ -60,21 +70,16 @@ serviceRoutes.get("/services", async (req: Request, res: Response) => {
     let where: Prisma.ServiceWhereInput;
 
     if (status === "unreceipted") {
-      // Filtro específico para serviços SEM recibo.
-      // TODO: Adicionar um 'createdById' ao serviço para segurança real.
       where = { receiptId: null };
     } else if (status === "receipted") {
-      // Filtro específico para serviços COM recibo do usuário.
       where = {
         receipt: { createdById: userId },
       };
     } else {
-      // CASO PADRÃO (sem filtro): Mostra serviços que OU não têm recibo OU pertencem ao usuário.
-      // Esta é a mudança principal.
       where = {
         OR: [
-          { receiptId: null }, // Mostra os serviços "livres"
-          { receipt: { createdById: userId } }, // Mostra os serviços já associados ao usuário
+          { receiptId: null },
+          { receipt: { createdById: userId } },
         ],
       };
     }
@@ -135,8 +140,18 @@ serviceRoutes.put("/services/:id", async (req: Request, res: Response) => {
   try {
     const serviceId = parseInt(req.params.id, 10);
     const userId = req.user?.userId;
-    const { serviceDate, transfer, extras, total, routeId, driverId, expense } =
-      req.body;
+    // --- ALTERAÇÃO: Adicionado passengerTransported ---
+    const {
+      serviceDate,
+      transfer,
+      extras,
+      total,
+      routeId,
+      driverId,
+      expense,
+      passengerTransported,
+    } = req.body;
+
     const existingService = await prisma.service.findFirst({
       where: {
         id: serviceId,
@@ -158,6 +173,7 @@ serviceRoutes.put("/services/:id", async (req: Request, res: Response) => {
       where: { id: serviceId },
       data: {
         serviceDate: serviceDate ? new Date(serviceDate) : undefined,
+        passengerTransported,
         transfer: finalTransfer,
         extras: finalExtras,
         total: calculatedTotal,
