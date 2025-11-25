@@ -55,6 +55,8 @@ model Receipt {
   observations String? // Alterado para String? para corresponder a 'text'
   language     String   @db.VarChar(5)
   grandTotal   Decimal  @default(0) @db.Decimal(12, 2)
+  includeServicePassengers Boolean  @default(false)
+  useSingleColumn          Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   createdById  Int
@@ -67,6 +69,7 @@ model Service {
   id          Int      @id @default(autoincrement())
   serviceDate DateTime
   passengerTransported  String?
+  serviceDescription   String?
   transfer    Decimal  @default(0) @db.Decimal(12, 2)
   extras      Decimal  @default(0) @db.Decimal(12, 2)
   total       Decimal  @default(0) @db.Decimal(12, 2)

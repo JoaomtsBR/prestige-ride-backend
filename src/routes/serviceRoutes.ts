@@ -24,6 +24,7 @@ serviceRoutes.post("/services", async (req: Request, res: Response) => {
       driverId,
       expense,
       passengerTransported,
+      serviceDescription,
     } = req.body;
 
     if (!routeId || !driverId || !serviceDate) {
@@ -39,6 +40,7 @@ serviceRoutes.post("/services", async (req: Request, res: Response) => {
       data: {
         serviceDate: new Date(serviceDate),
         passengerTransported,
+        serviceDescription,
         transfer,
         extras,
         total: calculatedTotal,
@@ -150,6 +152,7 @@ serviceRoutes.put("/services/:id", async (req: Request, res: Response) => {
       driverId,
       expense,
       passengerTransported,
+      serviceDescription,
     } = req.body;
 
     const existingService = await prisma.service.findFirst({
@@ -174,6 +177,7 @@ serviceRoutes.put("/services/:id", async (req: Request, res: Response) => {
       data: {
         serviceDate: serviceDate ? new Date(serviceDate) : undefined,
         passengerTransported,
+        serviceDescription,
         transfer: finalTransfer,
         extras: finalExtras,
         total: calculatedTotal,
