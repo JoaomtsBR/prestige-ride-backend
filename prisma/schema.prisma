@@ -57,6 +57,8 @@ model Receipt {
   grandTotal   Decimal  @default(0) @db.Decimal(12, 2)
   includeServicePassengers Boolean  @default(false)
   useSingleColumn          Boolean  @default(false)
+  paymentMethod            String?  @db.VarChar(50)
+  visibleColumns           Json?    @default("{\"transfer\": true, \"extras\": true, \"total\": true}")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   createdById  Int

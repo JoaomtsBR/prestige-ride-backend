@@ -84,17 +84,17 @@ router.post("/generate", async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Usuário não autenticado." });
     }
 
-    const { serviceIds, ...receiptData } = req.body;
+    // 1. Extraímos o 'grandTotal' do corpo para decidir se usamos ele ou calculamos
+    const { serviceIds, includePassengers, grandTotal, ...receiptData } = req.body;
 
     if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
       return res.status(400).json({
-        message:
-          'O campo "serviceIds" é obrigatório e deve ser um array de IDs.',
+        message: 'O campo "serviceIds" é obrigatório e deve ser um array de IDs.',
       });
     }
 
     const generatedReceipt = await prisma.$transaction(async (tx) => {
-      // 1. Valida se todos os serviços existem e estão "livres" (sem recibo)
+      // Valida se todos os serviços existem e estão "livres"
       const servicesToLink = await tx.service.findMany({
         where: {
           id: { in: serviceIds },
@@ -102,28 +102,37 @@ router.post("/generate", async (req: Request, res: Response) => {
         },
       });
 
-      // Se a contagem de serviços encontrados não bate com a de IDs enviados, algo está errado
       if (servicesToLink.length !== serviceIds.length) {
         throw new Error(
           "Um ou mais serviços não foram encontrados ou já pertencem a outro recibo."
         );
       }
-      // 2. Calcula o grandTotal a partir dos serviços encontrados
-      const grandTotal = servicesToLink.reduce((sum, service) => {
-        return sum.plus(service.total); // Usa .plus() para somar Decimals corretamente
-      }, new Prisma.Decimal(0));
 
-      // 3. Cria o recibo principal com os dados e o total calculado
+      // --- LÓGICA DE CÁLCULO DO TOTAL (ALTERADA) ---
+      let finalGrandTotal: Prisma.Decimal;
+
+      // Se o grandTotal veio do front-end (foi editado manualmente), usamos ele.
+      if (grandTotal !== undefined && grandTotal !== null) {
+        finalGrandTotal = new Prisma.Decimal(grandTotal);
+      } else {
+        // Caso contrário, calculamos a soma dos serviços automaticamente
+        finalGrandTotal = servicesToLink.reduce((sum, service) => {
+          return sum.plus(service.total);
+        }, new Prisma.Decimal(0));
+      }
+      // ---------------------------------------------
+
+      // Cria o recibo principal
       const receipt = await tx.receipt.create({
         data: {
           ...receiptData,
           date: new Date(receiptData.date),
-          grandTotal: grandTotal,
+          grandTotal: finalGrandTotal, // Usa o valor decidido acima
           createdById: userId,
         },
       });
 
-      // 4. Atualiza todos os serviços para vinculá-los ao novo recibo
+      // Atualiza os serviços vinculados
       await tx.service.updateMany({
         where: { id: { in: serviceIds } },
         data: { receiptId: receipt.id },
