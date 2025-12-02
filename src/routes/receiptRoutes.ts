@@ -159,8 +159,8 @@ router.put("/:id", async (req: Request, res: Response) => {
   try {
     const receiptId = parseInt(req.params.id, 10);
     const userId = req.user?.userId;
-    // Ignora o campo 'services' para evitar manipulação indevida nesta rota
-    const { services, ...receiptUpdates } = req.body;
+    // Extrai serviceIds e services para tratamento especial
+    const { services, serviceIds, ...receiptUpdates } = req.body;
 
     const receipt = await prisma.receipt.findFirst({
       where: { id: receiptId, createdById: userId },
@@ -176,10 +176,52 @@ router.put("/:id", async (req: Request, res: Response) => {
       receiptUpdates.date = new Date(receiptUpdates.date);
     }
 
-    // ATENÇÃO: Esta rota não recalcula o grandTotal. Ela apenas atualiza os metadados do recibo.
-    const updatedReceiptData = await prisma.receipt.update({
-      where: { id: receiptId },
-      data: receiptUpdates,
+    // Usar transaction para atualizar recibo e serviços atomicamente
+    const updatedReceiptData = await prisma.$transaction(async (tx) => {
+      // Atualiza os metadados do recibo
+      const updatedReceipt = await tx.receipt.update({
+        where: { id: receiptId },
+        data: receiptUpdates,
+      });
+
+      // Se serviceIds foi enviado, atualizar os vínculos de serviços
+      if (Array.isArray(serviceIds)) {
+        // 1. Desvincular todos os serviços atuais deste recibo
+        await tx.service.updateMany({
+          where: { receiptId: receiptId },
+          data: { receiptId: null },
+        });
+
+        // 2. Vincular os novos serviços (se houver)
+        if (serviceIds.length > 0) {
+          await tx.service.updateMany({
+            where: { id: { in: serviceIds } },
+            data: { receiptId: receiptId },
+          });
+        }
+
+        // 3. Recalcular grandTotal baseado nos serviços vinculados
+        const linkedServices = await tx.service.findMany({
+          where: { receiptId: receiptId },
+        });
+        
+        const newGrandTotal = linkedServices.reduce((sum, service) => {
+          return sum.plus(service.total);
+        }, new Prisma.Decimal(0));
+
+        // 4. Atualizar o grandTotal do recibo
+        return await tx.receipt.update({
+          where: { id: receiptId },
+          data: { grandTotal: newGrandTotal },
+          include: {
+            services: {
+              include: { route: true, driver: true, expense: true },
+            },
+          },
+        });
+      }
+
+      return updatedReceipt;
     });
 
     const serializedReceipt = convertDecimalsToNumbers(updatedReceiptData);
