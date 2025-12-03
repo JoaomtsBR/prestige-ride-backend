@@ -70,7 +70,8 @@ model Receipt {
 model Service {
   id          Int      @id @default(autoincrement())
   serviceDate DateTime
-  passengerTransported  String?
+  passengerTransported String?
+  clientNameService    String?
   serviceDescription   String?
   transfer    Decimal  @default(0) @db.Decimal(12, 2)
   extras      Decimal  @default(0) @db.Decimal(12, 2)
